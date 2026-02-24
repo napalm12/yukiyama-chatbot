@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>yukiyama お問い合わせチャットbot</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* チャットウィジェットボタン */
+  .chat-toggle {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #1a73e8;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    font-size: 28px;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+  }
+  .chat-toggle:hover { transform: scale(1.08); }
+  .chat-toggle.open { display: none; }
+
+  /* チャットウィンドウ */
+  .chat-window {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 380px;
+    max-width: calc(100vw - 32px);
+    height: 560px;
+    max-height: calc(100vh - 48px);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    display: none;
+    flex-direction: column;
+    z-index: 10001;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
+  }
+  .chat-window.open { display: flex; }
+
+  /* ヘッダー */
+  .chat-header {
+    background: linear-gradient(135deg, #1a73e8, #4a9ff5);
+    color: #fff;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .chat-header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .chat-header-title .logo {
+    width: 32px;
+    height: 32px;
+    background: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #1a73e8;
+    font-size: 14px;
+  }
+  .chat-header h3 { font-size: 15px; font-weight: 600; }
+  .chat-header p { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+  .chat-close {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0.8;
+  }
+  .chat-close:hover { opacity: 1; }
+
+  /* メッセージエリア */
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    background: #f5f7fa;
+  }
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+
+  .message {
+    margin-bottom: 12px;
+    display: flex;
+    gap: 8px;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .message.bot { justify-content: flex-start; }
+  .message.user { justify-content: flex-end; }
+
+  .message .bubble {
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.6;
+    word-break: break-word;
+  }
+  .message.bot .bubble {
+    background: #fff;
+    color: #333;
+    border: 1px solid #e0e0e0;
+    border-top-left-radius: 4px;
+  }
+  .message.user .bubble {
+    background: #1a73e8;
+    color: #fff;
+    border-top-right-radius: 4px;
+  }
+  .message .bubble a {
+    color: #1a73e8;
+    text-decoration: underline;
+  }
+  .message.user .bubble a { color: #b3d4ff; }
+
+  /* カテゴリ選択ボタン */
+  .category-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .category-btn {
+    background: #e8f0fe;
+    color: #1a73e8;
+    border: 1px solid #c5d9f7;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .category-btn:hover {
+    background: #1a73e8;
+    color: #fff;
+  }
+
+  /* 入力エリア */
+  .chat-input-area {
+    padding: 12px 16px;
+    border-top: 1px solid #e8e8e8;
+    display: flex;
+    gap: 8px;
+    background: #fff;
+  }
+  .chat-input {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 24px;
+    padding: 10px 16px;
+    font-size: 14px;
+    outline: none;
+    font-family: inherit;
+  }
+  .chat-input:focus { border-color: #1a73e8; }
+  .chat-send {
+    background: #1a73e8;
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chat-send:hover { background: #1557b0; }
+  .chat-send:disabled { background: #ccc; cursor: not-allowed; }
+
+  /* タイピングインジケータ */
+  .typing { display: flex; gap: 4px; padding: 8px 14px; }
+  .typing span {
+    width: 7px; height: 7px;
+    background: #aaa;
+    border-radius: 50%;
+    animation: typing 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+</style>
+</head>
+<body>
+
+<!-- チャットトグルボタン -->
+<button class="chat-toggle" id="chatToggle" aria-label="チャットを開く">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+</button>
+
+<!-- チャットウィンドウ -->
+<div class="chat-window" id="chatWindow">
+  <div class="chat-header">
+    <div class="chat-header-title">
+      <div class="logo">Y</div>
+      <div>
+        <h3>yukiyama サポート</h3>
+        <p>よくあるご質問にお答えします</p>
+      </div>
+    </div>
+    <button class="chat-close" id="chatClose" aria-label="閉じる">&times;</button>
+  </div>
+
+  <div class="chat-messages" id="chatMessages"></div>
+
+  <div class="chat-input-area">
+    <input type="text" class="chat-input" id="chatInput" placeholder="質問を入力してください..." />
+    <button class="chat-send" id="chatSend" aria-label="送信">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ==========================================
+  // FAQ / 回答データベース
+  // ==========================================
+  const faqData = [
+    // ============================================================
+    // 滑走データ関連（最頻出カテゴリ - メール問い合わせ#1）
+    // ============================================================
+    {
+      keywords: ['滑走データを消してしまった', '滑走記録 削除', '滑走データ 復元', '誤って削除', 'データ消した', 'データ復元', '間違えて消した', 'データ消えた', '滑走履歴 復元', '復活させたい', '復旧', '記録が消えた', 'データを戻したい', 'ログを消した', 'ログが消えた', 'ログを削除', '滑走ログ消えた', '滑走ログ削除', '復元したい'],
+      category: '滑走データ',
+      question: '滑走データを間違えて消してしまった',
+      answer: '滑走データを誤って削除してしまった場合、サポーター（有料会員）の方は運営側で復元が可能です。\n\n【サポーター（有料会員）の方】\n以下の情報を添えて、お問い合わせフォームからご連絡ください。運営側で復元作業をいたします。\n・yukiyama ID（マイページ、またはアプリ左上メニュー「問い合わせ」から送信すると自動で送られます）\n・復元したい滑走データの日付\n・利用したスキー場名\n\n【無料会員の方】\nデータの復元はサポーター（有料会員）限定のサービスとなっております。復元をご希望の場合は、サポーターにご登録後にこちらメールまでご連絡ください。\n\n⚠ アカウント自体を削除した場合は、データの復元ができませんのでご注意ください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['自動ログアウトでデータが消えた', 'ログアウト後にデータがない', 'ログアウトしたら記録がなくなった', 'データが見えなくなった'],
+      category: '滑走データ',
+      question: 'ログアウト後に滑走記録が見えなくなった',
+      answer: '自動ログアウトやログアウト後にデータが表示されない場合は、ログイン方法が以前と異なっている可能性があります。\n\n【よくある原因】\n・以前はGoogleでログインしていたのに、今回はメールアドレスでログインした\n・Facebookでログインしていたのに、別の方法でログインした\n→ ログイン方法が異なると、別のアカウントとして扱われるため、データが表示されません。\n\n【対処方法】\n1. 一度ログアウトする\n2. 以前と同じ方法（Google/Facebook/メール）でログインし直す\n\nそれでもデータが見つからない場合は、お問い合わせフォームからyukiyama IDをお知らせください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['リフト回数がおかしい', 'リフトカウント', 'リフト数が少ない', 'リフトが反映されない', '滑走回数', 'リフト計測', '距離がおかしい', '距離が正確でない', '計測されない'],
+      category: '滑走データ',
+      question: 'リフト回数・距離が正確に計測されない',
+      answer: 'リフト回数や滑走距離が正確に表示されない場合は、以下をご確認ください。\n\n1. 位置情報の許可が「常に許可」になっているか\n2. アプリがバックグラウンドでも動作する設定になっているか\n3. バッテリー節約モード（低電力モード）がOFFか\n4. マイページのGPS精度設定を上げてみる\n\n【iPhoneの場合】設定 > yukiyama > 位置情報 > 「常に」を選択\n【Androidの場合】設定 > アプリ > yukiyama > 権限 > 位置情報 > 「常に許可」\n\nまたAndroid端末の場合、以下の設定もご確認ください：\n・Google位置情報の精度：オン\n・Wi-Fiスキャン：オン\n・Bluetoothスキャン：オン\n・バッテリーの最適化：yukiyamaを「最適化しない」に設定\n\n※GPS精度を上げると計測が正確になりますが、電池消費が増えます。\n※天候や地形（トンネル、谷間等）により、GPS精度が一時的に低下する場合がございます。'
+    },
+    {
+      keywords: ['速度がおかしい', '速度が正確でない', '100キロ', '100km', '最高速度 異常', '速度 エラー', '速度 おかしい', 'ランキング おかしい', '異常な速度', '異常値', 'GPS スタック', '速度記録 おかしい'],
+      category: '滑走データ',
+      question: '最高速度が異常な値（100km超など）になっている',
+      answer: '100km/h超などの異常な速度が記録される場合は、GPSが特定の地点でスタックし（屋内など電波の届きにくい場所）、その後正しいGPSを拾った地点に一瞬でワープするときに発生する現象です。お客様の端末固有の問題となります。\n\n【現状の制限】\n残念ながら、異常値の部分だけを削除する機能は現段階ではございません。\n\n【代替対処法】\n・その日の滑走記録を「非公開」に設定することで、ランキングへの影響を抑えることができます\n・滑走ログ編集機能（サポーター向け）で一部修正が可能な場合があります\n\n今後のアップデートで改善を検討しておりますので、ご不便をおかけして申し訳ございません。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['電池', 'バッテリー', '充電', '電池消費', '電池減る', '電池持ち', 'バッテリーの減りが早い', '省電力モード'],
+      category: '滑走データ',
+      question: 'バッテリーの減りが早い・ログが途切れる',
+      answer: 'yukiyamaアプリはチェックインとチェックアウトの時だけ電波を必要としますが、それ以外はスキー場の山の中で電波がなくてもGPSでログを取り続けることができます。\n\nバッテリー消費が激しい・ログが途切れる場合は、以下をご確認ください。\n\n【iPhone】\n・設定 > バッテリー > 低電力モード → OFF\n・設定 > yukiyama > 位置情報 > 「常に」\n\n【Android】\n・設定 > アプリ > yukiyama > バッテリー > 「最適化しない」または「制限なし」\n・端末のOSアップデートにより、省電力モードが自動でONになっている場合があります\n\nGPS精度設定（マイページ内）を下げると電池消費を抑えられますが、計測精度も下がります。バランスを見てご調整ください。\n\n※寒冷地ではバッテリーの減りが通常より早くなります。モバイルバッテリーの持参をおすすめします。'
+    },
+    {
+      keywords: ['過去シーズン', '昨シーズン', '去年のデータ', '以前のシーズン', '去年のログ', '過去のログ', '今シーズンしか見れない', '過去の記録', 'アーカイブ'],
+      category: '滑走データ',
+      question: '過去シーズンの滑走記録が見られない',
+      answer: '過去シーズンの滑走ログは、アプリのマイページ内「シーズン」切り替えから確認できます。\n\n【確認方法】\nマイページ > シーズン選択メニュー（現在のシーズン表示部分をタップ）> 見たいシーズンを選択\n\nアップデート後に表示が変わった場合、一度アプリを再起動するとシーズン切り替えメニューが正しく表示されることがあります。\n\nそれでも過去シーズンのデータが見つからない場合は、お問い合わせフォームよりyukiyama IDをお知らせください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+
+    // ============================================================
+    // チェックイン関連（頻出カテゴリ#2）
+    // ============================================================
+    {
+      keywords: ['チェックインがグルグル', 'チェックイン 読み込み', 'チェックインボタン押しても', 'ゲレンデマップ読み込み中', 'グルグル回る', 'チェックインが進まない', 'チェックインできない', 'チェックイン不具合'],
+      category: 'チェックイン',
+      question: 'チェックインボタンを押してもグルグル回って進まない',
+      answer: 'GPSが場所を特定できずにグルグルすることがあります。GPSの問題ですので、以下をお試しください。\n\n1. 一度端末の電源を入れ直す（GPSが正常に動き出すことがあります）\n2. 屋外に出てお試しください\n3. Wi-Fiをオフにしてモバイルデータ通信でお試しください（スキー場のWi-Fiが不安定な場合があります）\n4. アプリを最新バージョンにアップデート\n\n【iPhone】位置情報の設定確認\n設定 > yukiyama > 位置情報 > 「常に」を選択（「このAppの使用中のみ」は不可）\n正確な位置情報：オン\n設定 > 一般 > Appのバックグラウンド更新：オン\n設定 > バッテリー > 低電力モード：オフ\n\n【Android】位置情報・バッテリーの設定確認\n設定 > アプリ > yukiyama > 権限 > 位置情報 > 「常に許可」（「アプリ使用中のみ」は不可）\n正確な位置情報：オン\n設定 > アプリ > yukiyama > バッテリー > 「制限なし」\n\nそれでも解決しない場合は、ご利用のスキー場名・端末名をお問い合わせフォームからお知らせください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['チェックインの仕方', 'チェックイン方法', 'チェックインやり方', 'どうやってチェックイン'],
+      category: 'チェックイン',
+      question: 'チェックインの方法がわからない',
+      answer: 'チェックインの手順は以下の通りです。\n\n1. スキー場の敷地内に到着する（駐車場でもOK）\n2. アプリを開き「チェックイン」ボタンをタップ\n3. 近くのスキー場が表示されるので、該当するスキー場を選択\n\n※チェックインは必ず屋外で行ってください。\n\n【チェックインできない場合の確認事項】\n・スマホのGPS（位置情報）がONになっているか\n・yukiyamaアプリの位置情報許可が「常に許可」になっているか（「使用中のみ」では不可）\n\n【iPhoneの場合】設定 > yukiyama > 位置情報 > 「常に」\n【Androidの場合】設定 > アプリ > yukiyama > 権限 > 位置情報 > 「常に許可」'
+    },
+    {
+      keywords: ['GPS', '位置情報', '場所がずれ', '現在地', '位置がおかしい', '位置ずれ', 'GPSマップ', 'マップ範囲'],
+      category: 'チェックイン',
+      question: 'GPSの位置がズレる・精度が悪い',
+      answer: 'GPSの精度に問題がある場合は以下をお試しください。\n\n1. 一度端末の電源を入れ直す\n2. 屋内の場合は屋外に出てお試しください\n3. マイページのGPS精度設定で精度を調整できます\n\n※GPS精度を上げると計測は正確になりますが、電池消費が増えます。バランスを見てご調整ください。\n※山間部やリフト上など電波状況が悪い場所では一時的にGPSがズレることがあります。'
+    },
+    {
+      keywords: ['途中でチェックアウトされる', '勝手にチェックアウト', '自動チェックアウト', '強制チェックアウト', 'ログが途中で終わる', 'ログ途切れ'],
+      category: 'チェックイン',
+      question: '滑走中に自動でチェックアウトされてしまう',
+      answer: 'yukiyamaアプリはチェックインとチェックアウトの時だけ電波を必要としますが、それ以外はスキー場の山の中で電波がなくてもGPSでログを取り続けることができます。\n\n途中でチェックアウトされてしまう場合は、以下の設定をご確認ください。\n\n【Android（特に重要）】\nAndroidはここをきちんと設定しないと途中でチェックアウトされてしまうケースが非常に多いです。\n・設定 > アプリ > yukiyama > 権限 > 位置情報 > 「常に許可」\n・設定 > アプリ > yukiyama > バッテリー > 「制限なし」（電池の最適化：オフ）\n・設定 > アプリ > yukiyama > モバイルデータとWi-Fi > バックグラウンドデータ：オン\n・設定 > バッテリー > 省電力モード：オフ（滑走中は必ずオフ）\n\n【iPhone】\n・設定 > yukiyama > 位置情報 > 「常に」\n・設定 > バッテリー > 低電力モード：オフ\n・設定 > 一般 > Appのバックグラウンド更新：オン\n\n⚠ スキー場でチェックアウトできなかった場合、翌朝6時に自動チェックアウトとなります。その場合、正確なログがアプリに反映されるのは翌朝6時となります。'
+    },
+    {
+      keywords: ['チェックアウトできない', 'Ride Nowのまま', 'チェックアウトし忘れ', 'チェックアウト忘れ', 'チェックアウトが止まる', '滑走中のまま'],
+      category: 'チェックイン',
+      question: 'チェックアウトできない・Ride Nowのまま止まる',
+      answer: 'チェックアウトできない、またはRide Nowの状態で止まってしまう場合は、以下をお試しください。\n\n1. アプリを一度完全に閉じて再起動\n2. 通信環境の良い場所でチェックアウトを試す\n3. アプリを最新バージョンにアップデート\n\n※チェックアウトし忘れた場合でも、翌朝6時に自動的にチェックアウトされますのでご安心ください。ただし、その場合の滑走ログは翌朝6時に反映されます。\n\nチェックアウト時に「公開設定」をONにすると、タイムラインにシェアされます。'
+    },
+
+    // ============================================================
+    // ログイン関連
+    // ============================================================
+    {
+      keywords: ['ログインできない', 'ログイン不具合', 'ログインエラー', 'サインイン', '入れない', 'ログインの仕方'],
+      category: 'ログイン',
+      question: 'アプリにログインできない',
+      answer: 'ログインできない場合は、登録時と同じ方法（Google/Facebook/X/メールアドレス）でログインしているかをまずご確認ください。\n\n【よくある原因】\n以前と異なるログイン方法を選ぶと、別のアカウントとして扱われデータが見えなくなります。\n\n【アカウントのログイン方法を忘れた場合】\nお問い合わせフォームより以下をお知らせください。運営側でアカウントをお調べし、ログイン方法をご案内いたします。\n・yukiyama ID または ニックネーム\n・登録時に使ったと思われるメールアドレス\n\n【ログインできた後のおすすめ設定】\nアプリ左上メニュー > アカウント設定 > メールアドレスを登録しておくことをおすすめいたします。そうすることで、Google連携やFacebook連携に加えてメールアドレスでもログインが可能になり、機種変更時もスムーズです。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['メアドもパスワードも忘れた', 'メールアドレス忘れた', 'パスワード忘れた', 'IDも忘れた', '全て忘れた', '全部忘れた', 'パスワードわからない', 'パスワードリセット', 'パスワード再設定'],
+      category: 'ログイン',
+      question: 'メールアドレス・パスワード・IDを忘れた',
+      answer: 'ログイン情報をお忘れの場合は、状況に応じて以下をお試しください。\n\n【パスワードだけ忘れた場合】\nログイン画面の「パスワードを忘れた場合はこちら」から再設定できます。\n\n【メールアドレスも忘れた場合】\nお問い合わせフォームより以下の情報をお知らせください。運営側でアカウントをお調べし、ログイン方法をご案内いたします。\n・お名前（ニックネーム）\n・登録時に使った可能性のあるメールアドレス\n・Google/Facebook/X（Twitter）で登録した記憶があるかどうか\n\n⚠ メールが届かない場合：\n・迷惑メールフォルダをご確認ください\n・「@yuki-yama.com」を受信許可に設定してください\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['facebook連携', 'facebook ログイン', 'fb連携', 'facebookでログイン', 'facebook使えない'],
+      category: 'ログイン',
+      question: 'Facebookでログインできない',
+      answer: 'Facebook連携でのログインに問題がある場合は、まずFacebook自体にログインできるかご確認ください。\n\nFacebookにログインできない場合：\nブラウザでFacebook公式サイトにアクセスし、「ログインでお困りですか？」→「別の方法を試す」から本人確認（身分証提出）で復旧できる場合があります（数日かかることがあります）。\n\nFacebookにログインできたら：\n1. yukiyamaアプリのログイン画面でFacebookボタンをタップ\n2. ログインできたら、アプリ左上メニュー > アカウント設定 > メールアドレスを登録しておくことをおすすめします\n\nそれでも解決しない場合は、お問い合わせフォームからご連絡ください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['google連携', 'google ログイン', 'googleでログイン', 'グーグル連携', 'グーグルログイン'],
+      category: 'ログイン',
+      question: 'Googleでログインできない',
+      answer: 'Google連携でのログインは、アプリのログイン画面の「G」マークをタップしてください。\n\n複数のGoogleアカウントをお持ちの場合は、yukiyamaと連携されているGoogleアカウントにログインしてからyukiyamaにログインしてください。\n\nログインできたら、アプリ左上メニュー > アカウント設定 > メールアドレスを登録しておくことをおすすめします。そうすることで、Google連携とメールアドレスの2通りでログインが可能になります。\n\nそれでも解決しない場合は、お問い合わせフォームからご連絡ください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['X連携', 'Xでログイン', 'twitter連携', 'twitterでログイン', 'Xアカウント', '旧Twitter'],
+      category: 'ログイン',
+      question: 'X（旧Twitter）でログインできない',
+      answer: 'X（旧Twitter）連携でのログインに問題が多く報告されています（X側の仕様変更によるものです）。\n\n【対処方法】\n1. アプリのログイン画面の「X」マークをタップしてログインをお試しください\n2. ログインできたら、アプリ左上メニュー > アカウント設定 > メールアドレスを登録してください。そうすることで今後はメールアドレスでもログインが可能になります\n\nアプリを再インストールする場合は、先にアカウント設定からメールアドレスを登録しておくことをおすすめいたします（再インストール後もデータはすべて戻ってきます）。\n\nそれでも解決しない場合は、お問い合わせフォームからご連絡ください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['勝手にログアウト', 'ログアウトされる', '強制ログアウト', '急にログアウト', '1週間でログアウト'],
+      category: 'ログイン',
+      question: '勝手にログアウトされてしまう',
+      answer: '勝手にログアウトされてしまう場合は、以下をお試しください。\n\n1. アプリを最新バージョンにアップデート\n2. 登録時と同じ方法（Facebook/Google/X/メールアドレス）で再度ログイン\n\n再度ログインすれば、データはそのまま引き継がれます。\n\nまた、アカウント設定からメールアドレスを登録しておくと、次回以降もスムーズにログインできます。\n\n何度もログアウトが繰り返される場合は、お問い合わせフォームよりご連絡ください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+
+    // ============================================================
+    // アカウント関連
+    // ============================================================
+    {
+      keywords: ['アカウント削除', '退会', 'アカウント消したい', '削除したい', '退会したい', 'やめたい'],
+      category: 'アカウント',
+      question: 'アカウントを削除（退会）したい',
+      answer: 'アカウントの削除は、アプリ左上のメニューから行えます。\n\n⚠ 削除すると滑走データ等は全て失われ、復元できませんのでご注意ください。\n\n※サポーター契約をされている場合は、先にストア（App Store / Google Play）からサポーター契約の解約手続きを行ってからアカウントを削除してください。アプリを削除しただけではサポーター契約は解約されません。'
+    },
+    {
+      keywords: ['機種変更', '引き継ぎ', 'データ引継', '新しいスマホ', '乗り換え', '端末変更', 'スマホ変えた'],
+      category: 'アカウント',
+      question: '機種変更したらデータは引き継げる？',
+      answer: '機種変更後も、以前と同じログイン方法（Google/Facebook/メールアドレス）でログインすれば、滑走データはそのまま引き継がれます。\n\n⚠ ご注意点：\n・以前のログイン方法（Google/Facebook/メール）を覚えていない場合は、お問い合わせフォームからご連絡ください\n・サポーター契約をされている方で、GoogleアカウントやApple IDが変わった場合は、定期購入の移行手続きが必要な場合があります\n\n💡 ヒント：機種変更前にアカウント設定からメールアドレスを登録しておくと、新端末でもスムーズにログインできます。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['メールアドレス変更', 'メアド変更', 'メール変更', '登録メール', 'アドレス変更'],
+      category: 'アカウント',
+      question: '登録メールアドレスを変更したい',
+      answer: 'メールアドレスの変更は、アプリにログイン後「アカウント設定」から設定・変更が可能です。\n\nGoogle連携やFacebook連携でログインしている場合でも、アカウント設定からメールアドレスを追加設定すると、メールアドレスでのログインも可能になります。\n\n※機種変更時のログインにも使えるため、メールアドレスの設定をおすすめします。'
+    },
+    {
+      keywords: ['アカウント統合', '複数アカウント', 'アカウント2つ', 'データ統合', 'データ移行'],
+      category: 'アカウント',
+      question: '2つのアカウントを統合したい',
+      answer: '申し訳ございませんが、現在2つのアカウントのデータを統合する機能はございません。\n\n以下の手順をおすすめいたします：\n1. メインで使いたいアカウントを決める\n2. メインアカウントにメールアドレスを追加設定する（アカウント設定から）\n3. 不要なアカウントは「アカウント設定」から削除する\n\n※機種変更された場合も、以前と同じログイン方法（Facebook/Google/メールアドレス）でログインすれば、データはそのまま引き継がれます。'
+    },
+
+    // ============================================================
+    // 写真・投稿関連（メールで複数件の問い合わせあり）
+    // ============================================================
+    {
+      keywords: ['写真が回転', '写真が横になる', '写真が逆', '写真が上下反転', '90度回転', '写真の向き', '写真が縦にならない', '写真 反転', '画像回転', '投稿写真 向き'],
+      category: 'アプリ不具合',
+      question: '投稿した写真が回転・反転してしまう',
+      answer: '写真が90°回転したり上下反転して表示される不具合は、一部のAndroid端末で確認されておりました。\n\n【対処方法】\nアプリを最新バージョン（Ver10.2.0以降）にアップデートしてください。このバージョンで修正が行われています。\n\n【アップデートしても改善しない場合】\n以下の情報をお問い合わせフォームからお知らせください。\n・端末名とOSバージョン\n・撮影時のスマホの向き（縦撮り/横撮り）\n・アプリのバージョン\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+
+    // ============================================================
+    // イベント・賞品・クーポン関連
+    // ============================================================
+    {
+      keywords: ['当選したのに届かない', '賞品届かない', '発送まだ', '当選通知来たけど届かない', 'プレゼント届かない', '景品届かない', '届いてない', '当選メール', '当選メールいつ届く'],
+      category: 'イベント・クーポン',
+      question: '当選通知が来たのに賞品が届かない',
+      answer: 'イベント賞品の発送につきましては、イベント終了後に順次対応しております。\n\n【発送時期について】\n・通常、イベント終了後1〜2ヶ月程度でお届けしております\n・発送時期はイベントにより異なります\n・シーズン終了後にまとめて発送する場合もございます\n\n⚠ ご確認ください：\n・当選後にお届け先情報の入力依頼メール（個人情報記入フォーム）が届いた場合は、必ずご回答をお願いいたします\n・ご回答がない場合、発送できない場合がございます\n・迷惑メールフォルダに振り分けられていないかご確認ください\n\n発送状況のお問い合わせは、お問い合わせ番号（ykymXXXXXXXX）をお知らせください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['クーポン', 'チェックインクーポン', 'クーポンが出ない', 'クーポン表示されない', 'クーポンどこ'],
+      category: 'イベント・クーポン',
+      question: 'チェックインクーポンが表示されない',
+      answer: 'クーポンは、スキー場にチェックイン後に表示されます。\n\n【確認方法】\nチェックイン後、画面右上のクーポンボタンをタップしてください。\n\n「チェックインクーポン」と「プレミアムチケット」の2種類があります。利用条件はクーポンごとに異なりますので、詳細をご確認ください。\n\n※クーポンが表示されない場合は、対象スキー場でのチェックインが必要です。また、配信期間が終了している場合もございます。'
+    },
+    {
+      keywords: ['プレチケ', 'プレミアムチケット', 'シーズンパス', 'シーパス', 'チケット届かない'],
+      category: 'イベント・クーポン',
+      question: 'プレミアムチケット（プレチケ）が届かない',
+      answer: 'プレミアムチケット（プレチケ）は、イベント参加時に配信される個人向けチケットです。\n\n【確認方法】\nマイページの「プレチケ」ボタンから確認できます。\n\n※プレチケの配信タイミングはイベントにより異なります。チェックイン後すぐに届く場合と、後日届く場合がございます。届かない場合はお問い合わせフォームよりご連絡ください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['イベント', 'イベント参加', '参加方法', 'エントリー', '鬼ごっこ'],
+      category: 'イベント・クーポン',
+      question: 'イベントの参加方法がわからない',
+      answer: 'yukiyamaイベントへの参加方法は、開催期間中に対象スキー場でチェックインすると自動的に参加となる場合がほとんどです。\n\n一部イベントでは事前エントリーが必要な場合もあります。詳細はアプリ内のイベント情報をご確認ください。\n\n※「ゲレンデ鬼ごっこ」等の特別イベントの当選結果は、イベント終了後にアプリ内通知またはメールでお知らせいたします。'
+    },
+
+    // ============================================================
+    // サポーター契約関連
+    // ============================================================
+    {
+      keywords: ['サポーター解約', 'サポーター退会', '定期購入', 'サブスク解約', 'サブスクリプション', 'サブスク', '月額', '年額', '課金', 'サポーターやめたい'],
+      category: 'サポーター契約',
+      question: 'サポーター契約を解約したい',
+      answer: 'サポーター契約の解約は、ご利用のスマホのストアから手続きが必要です。\n\n【iPhoneの場合】\n設定 > Apple ID > サブスクリプション > yukiyama > サブスクリプションをキャンセル\n\n【Androidの場合】\nGoogle Playストア > メニュー > 定期購入 > yukiyama > 定期購入を解約\n\n⚠ ご注意：\n・yukiyamaアプリを削除しただけでは契約は解約されません\n・アカウントを削除しても、ストア側の定期購入は自動的には解約されません\n・機種変更した場合は、以前の端末のストアアカウントで解約手続きが必要です\n・解約後も契約期間中はサポーター特典をご利用いただけます\n\n解約方法がわからない場合は、お問い合わせフォームよりご連絡ください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['サポーター特典', 'サポーターメリット', 'サポーターとは', 'サポーター機能', 'サポーターになると'],
+      category: 'サポーター契約',
+      question: 'サポーター契約の特典を知りたい',
+      answer: 'サポーター契約をすると、以下の特典がご利用いただけます。\n\n・スケジュール事前作成機能\n・グループ事前作成機能\n・投稿写真を1投稿につき4枚以上アップロード可能\n・滑走ログ編集機能（2024年10月以降のデータ対象）\n・削除済み滑走ログの復元機能\n\n詳しくはアプリ内の「サポーターになる」ボタンからご確認ください。\n\n※原則、いかなる理由があっても返金は受け付けておりません。'
+    },
+
+    // ============================================================
+    // アプリ不具合関連
+    // ============================================================
+    {
+      keywords: ['通信のいい場所でやり直してください', '通信エラー', 'アプリが開けない', 'アプリ開かない', '接続エラー', 'ネットワークエラー'],
+      category: 'アプリ不具合',
+      question: '「通信のいい場所でやり直してください」と表示される',
+      answer: '「通信のいい場所でやり直してください」と表示されてアプリが開けない場合は、以下をお試しください。\n\n1. Wi-Fiとモバイルデータ通信を切り替える（スキー場のWi-Fiが不安定な場合があります）\n2. 機内モードをON→OFFにして通信をリセット\n3. アプリを完全に閉じてから再起動\n4. スマホ本体を再起動\n5. アプリを最新バージョンにアップデート\n6. それでもダメな場合は、アプリを再インストール\n\n⚠ 再インストールしてもデータは消えません。同じアカウントでログインすればデータは復元されます。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['急にホームに飛ぶ', '操作中に落ちる', 'アプリが落ちる', 'クラッシュ', 'フリーズ', '固まる', '不具合', 'バグ', '動かない', '開けない', '起動しない', '真っ白'],
+      category: 'アプリ不具合',
+      question: 'アプリが落ちる・フリーズする',
+      answer: 'アプリが突然閉じたり、フリーズする場合は以下を順番にお試しください。\n\n1. アプリを最新バージョンにアップデート\n2. スマホを再起動\n3. 他のアプリを閉じてメモリを解放\n4. アプリを一度削除して再インストール\n\n⚠ 再インストールしてもデータは消えません。同じアカウントでログインすればデータは復元されます。\n\nそれでも改善しない場合は、以下の情報をお問い合わせフォームからお知らせください。\n・お使いの端末名（例：iPhone 15, Pixel 8など）\n・OSバージョン（例：iOS 18.2, Android 14など）\n・アプリバージョン\n・不具合の詳しい状況（どの画面で、何をしたときに発生するか）\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['500エラー', 'サーバーエラー', 'ページが表示されない', '接続できない', 'サーバー'],
+      category: 'アプリ不具合',
+      question: '500エラー・サーバーエラーが出る',
+      answer: 'サーバーエラー（500エラー等）が表示される場合は、一時的なサーバーの問題の可能性があります。\n\n以下をお試しください：\n1. しばらく時間をおいてから再度お試しください\n2. アプリを再起動してください\n3. Wi-Fiとモバイルデータ通信を切り替えてお試しください\n\nしばらく経っても改善しない場合は、お問い合わせフォームよりご連絡ください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['タイムライン検索できない', '絞り込みできない', 'タイムライン', '検索', 'タイムラインの絞り込み'],
+      category: 'アプリ不具合',
+      question: 'タイムラインの絞り込み検索ができない',
+      answer: 'タイムラインの絞り込み検索がうまく動作しない場合は、以下をお試しください。\n\n1. アプリを最新バージョンにアップデート\n2. アプリを完全に閉じてから再起動\n3. 改善しない場合は、アプリを再インストール\n\n⚠ 再インストールしてもデータは消えません。\n\nそれでも解決しない場合は、お問い合わせフォームより端末名・OSバージョンをお知らせください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['リンクが飛べない', 'リンクが開かない', 'インスタ リンク', 'SNSリンク', 'URL開けない', 'リンク先に飛べない'],
+      category: 'アプリ不具合',
+      question: 'プロフィールのSNSリンクが開けない',
+      answer: 'プロフィールに設定したSNSリンク（Instagram、X等）が開けない場合は、以下をご確認ください。\n\n1. リンクURLが正しく入力されているか（https:// から始まるURLを入力してください）\n2. アプリを最新バージョンにアップデート\n3. リンク先のSNSアプリがインストールされているか確認\n\nそれでも改善しない場合は、お問い合わせフォームからお知らせください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['下のバーが消える', 'タブが消える', 'ホーム画面に戻れない', '下部のボタン', 'タブメニュー消えた', '戻るボタンがない', '画面下が消える', '下のナビ', 'バーが表示されない', 'タブバー消える'],
+      category: 'アプリ不具合',
+      question: 'アップデート後に下のタブバーが消えてホーム画面に戻れない',
+      answer: 'アップデート後に画面下部のタブメニューが消えてホーム画面に戻れなくなる不具合のご報告をいただいております。\n\n【対処方法】\n1. アプリを一度完全に閉じてから再起動する\n2. アプリを最新バージョンにアップデートする（修正版がリリースされている場合があります）\n3. それでも改善しない場合はアプリを再インストール\n\n⚠ 再インストールしてもデータは消えません。同じアカウントでログインすればデータは復元されます。\n\nお使いの端末名・OSバージョン・アプリバージョンをお問い合わせフォームからお知らせいただけると、早急に対応いたします。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['写真アップロードできない', '写真が反映されない', '写真が白い', '白い四角', 'アイコン写真', '写真投稿できない', '画像アップロード'],
+      category: 'アプリ不具合',
+      question: '写真がアップロードできない・反映されない（Android）',
+      answer: 'Android端末で写真がアップロードできない場合は、以下をご確認ください。\n\n1. アプリを最新バージョンにアップデート\n2. アプリのストレージ・写真へのアクセス権限が許可されているか確認\n   設定 > アプリ > yukiyama > 権限 > ストレージ（または写真・メディア） > 許可\n3. スマホの空き容量が十分にあるか確認\n4. アプリを完全に閉じて再起動してからお試しください\n\nそれでも改善しない場合は、お手数ですが以下の情報をお問い合わせフォームからお知らせください。\n・お使いの端末名（例：Galaxy S24、Pixel 8など）\n・Androidのバージョン\n・アプリのバージョン\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['スケジュール', 'スケジュール作成', 'スケジュール機能', 'スキー場検索できない', 'スケジュール スキー場'],
+      category: 'アプリ不具合',
+      question: 'スケジュール機能でスキー場を検索できない',
+      answer: 'スケジュール作成画面の「スキー場検索」ボタンをタップしてスキー場名を入力できない場合は、まずアプリを最新バージョンにアップデートしてお試しください。\n\nそれでも改善しない場合は、問題が発生している状況の画面録画を撮影して、お問い合わせフォームからお送りください。確認のうえ解決策をご案内いたします。\n\n※スケジュール事前作成機能はサポーター（有料会員）向けの機能です。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+
+    // ============================================================
+    // スタンサー連携（新規追加 - メールで問い合わせあり）
+    // ============================================================
+    {
+      keywords: ['スタンサー', 'STANCER', 'レギュラー グーフィー', 'レギュラーグーフィー逆', 'スタンス逆', 'スタンサー連携', 'スタンサー記録'],
+      category: '外部連携',
+      question: 'スタンサーの記録でレギュラー/グーフィーが逆になる',
+      answer: 'スタンサーの記録をyukiyamaに手入力した際、レギュラー/グーフィーが逆に表示されるとのお問い合わせをいただいております。\n\nお手数ですが、以下の情報をお問い合わせフォームからお知らせください。確認のうえ対応いたします。\n\n・yukiyama ID\n・スタンサーで計測したスタンス（レギュラー/グーフィー）\n・yukiyamaアプリ上での表示内容\n・スクリーンショット（あれば）\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+
+    // ============================================================
+    // ウォッチ連携（新規追加 - メールで問い合わせあり）
+    // ============================================================
+    {
+      keywords: ['ウォッチ', 'スマートウォッチ', 'Apple Watch', 'WATCH', '対象外のスキー場', 'ウォッチ連携', '時計'],
+      category: '外部連携',
+      question: 'スマートウォッチ連携で「対象外のスキー場」と表示される',
+      answer: 'スマートウォッチで「対象外のスキー場です」と表示される場合、ウォッチ連携に対応していないスキー場の可能性がございます。\n\n【対応スキー場・連携方法の確認】\n以下のページに対象スキー場一覧と連携手順が掲載されています。\n<a href="https://yukiyama-web.com/news/86292/" target="_blank">ウォッチ連携の対応スキー場・設定方法</a>\n\n【ウォッチでうまくいかない場合】\n・スマホアプリからチェックインをお試しください\n・アプリとウォッチの両方を最新バージョンにアップデートしてください\n\nそれでも解決しない場合は、お問い合わせフォームからご連絡ください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['HUAWEI', 'ファーウェイ', 'ヘルスケア', 'HUAWEIヘルスケア', 'HUAWEI不具合', 'ファーウェイ不具合'],
+      category: '外部連携',
+      question: 'HUAWEI端末でyukiyamaが不安定・頻繁にアプリが切れる',
+      answer: 'HUAWEI端末でyukiyamaが不安定な場合は、HUAWEI HealthアプリとyukiyamaアプリがバックグラウンドでGPS取得を奪い合っていることが原因として多く確認されています。\n\n【対処方法】\n「HUAWEI Health グローバル」を最新バージョンにアップデートしてください。これで改善する場合がほとんどです。\n\nそれでも改善しない場合：\n・HUAWEI Healthアプリ内でHUAWEI IDでログインする\n・または HUAWEI Healthアプリを使用していない場合は、アプリごと削除する\n\nHUAWEI Healthアプリを削除することで、yukiyamaが安定して動作するようになります。\n\nそれでも解決しない場合は、お問い合わせフォームからご連絡ください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+
+    // ============================================================
+    // スキー場情報関連
+    // ============================================================
+    {
+      keywords: ['閉鎖スキー場', '営業していないスキー場', '閉鎖されたスキー場', '廃業', 'スキー場が残っている', 'スキー場削除'],
+      category: 'スキー場情報',
+      question: '閉鎖されたスキー場がアプリに残っている',
+      answer: '営業を終了（閉鎖）したスキー場がアプリに表示されている場合は、お手数ですがお問い合わせフォームからスキー場名をお知らせください。\n\n確認のうえ、情報を更新いたします。\n\n※スキー場情報は各スキー場からの提供情報を基にしていますが、閉鎖の情報が反映されていない場合がございます。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['スキー場情報', 'ゲレンデ情報', '営業情報', '積雪', 'リフト料金', '天気', '天候'],
+      category: 'スキー場情報',
+      question: 'スキー場の営業情報を知りたい',
+      answer: 'スキー場の最新情報は、アプリのサーチ機能で検索し、スキー場詳細画面から確認できます。\n\nお気に入り登録（★マーク）すると、ホーム画面で常に最新情報をチェックできます。\n\n※スキー場情報は各スキー場から提供されたものを掲載しています。最新の営業状況は各スキー場の公式サイトもあわせてご確認ください。'
+    },
+
+    // ============================================================
+    // 迷惑行為・不正利用関連
+    // ============================================================
+    {
+      keywords: ['迷惑', 'ストーカー', 'ブロック', '嫌がらせ', '迷惑行為', '通報', 'なりすまし', '誹謗中傷'],
+      category: '迷惑行為・通報',
+      question: '迷惑行為を受けている・ユーザーをブロックしたい',
+      answer: '迷惑行為を受けている場合は、以下の対応をお願いいたします。\n\n【ブロック方法】\n相手のプロフィール画面から「ブロック」をタップしてください。ブロックすると、相手からのフォローやメッセージが届かなくなります。\n\n【通報方法】\n相手のプロフィール画面から「通報する」をタップしてください。\n\n⚠ 深刻な被害を受けている場合：\n以下の情報をお問い合わせフォームからお知らせください。運営チームで確認のうえ、アカウント停止等の対応を検討いたします。\n・相手のユーザー名またはID\n・被害の内容\n・スクリーンショット（あれば）\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+    {
+      keywords: ['不正な速度記録', '不正記録', 'スピード違反', '営業時間外の記録', '最高速 不正', 'チート', '改ざん'],
+      category: '迷惑行為・通報',
+      question: '不正な速度記録・滑走記録を通報したい',
+      answer: '営業時間外の走行や道路での速度記録など、不正な記録を発見された場合は、お問い合わせフォームから以下の情報をお知らせください。\n\n・不正と思われるユーザーのニックネームまたはID\n・不正な記録の内容（スキー場名、日時、速度など）\n・スクリーンショット（あれば）\n\n確認のうえ、適切な対応を取らせていただきます。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+
+    // ============================================================
+    // グループ・フレンド機能
+    // ============================================================
+    {
+      keywords: ['グループ', '位置共有', 'GPS共有', '友達の位置', '仲間の場所', '位置確認', 'グループ作成', 'グループ参加'],
+      category: 'グループ・フレンド',
+      question: '仲間と位置情報を共有したい',
+      answer: '仲間とGPS位置情報を共有するには、チェックイン後にグループを作成してください。\n\n【手順】\n1. スキー場にチェックインする\n2. 画面右上のグループボタンをタップ\n3. 「グループ作成」で新しいグループを作成\n4. グループIDを仲間に共有する\n5. 仲間がグループIDを入力して参加\n\n参加者全員がチェックインした状態でグループに参加すると、リアルタイムで位置確認が可能になります。'
+    },
+    {
+      keywords: ['フレンド', 'フォロー', '友達追加', '友達登録', 'フレンド登録'],
+      category: 'グループ・フレンド',
+      question: 'フレンドを追加したい',
+      answer: 'フレンド登録は、相手のユーザー詳細画面で「フォローする」をタップするとフレンド登録できます。\n\nニックネームやIDで検索して、相手のプロフィールページを表示してください。'
+    },
+    {
+      keywords: ['グループ写真', '写真保存できない', '写真ダウンロード', '写真が保存できない'],
+      category: 'グループ・フレンド',
+      question: 'グループ写真が保存できない',
+      answer: 'グループ写真の保存に問題がある場合は、以下をご確認ください。\n\n1. アプリのストレージ/写真へのアクセス権限が許可されているか\n2. スマホの空き容量が十分にあるか\n3. アプリが最新バージョンか\n\n【Androidの場合】\n一部のAndroid端末で写真の保存がうまくいかない場合がございます。その場合はアプリのアップデートで改善される場合があります。\n\n解決しない場合は、端末名とOSバージョンをお問い合わせフォームからお知らせください。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォーム</a>'
+    },
+
+    // ============================================================
+    // プッシュ通知関連
+    // ============================================================
+    {
+      keywords: ['通知が来ない', '通知が多い', '通知設定', '通知オフ', 'プッシュ通知', '通知こない', '通知届かない', '通知重複', '同じ通知が何度も'],
+      category: 'プッシュ通知',
+      question: '通知が届かない・通知が多すぎる',
+      answer: '通知に関する問題については、以下をご確認ください。\n\n【通知が届かない場合】\n1. スマホの設定でyukiyamaアプリの通知が許可されているか確認\n2. アプリ内の通知設定がONになっているか確認\n3. おやすみモード/サイレントモードがOFFか確認\n\n【通知が多すぎる・重複して届く場合】\nアプリを最新バージョンにアップデートしてください。過去に通知が重複送信される不具合がありましたが、アップデートで改善されています。\n\n【通知をOFFにしたい場合】\nアプリ内の設定から個別に通知のON/OFFを切り替えられます。'
+    },
+
+    // ============================================================
+    // SNSシェア関連
+    // ============================================================
+    {
+      keywords: ['シェア', 'SNS', 'instagram', 'twitter', 'X共有', 'facebook シェア', '共有', 'youtube', '動画投稿'],
+      category: 'その他',
+      question: 'SNSにシェアしたい',
+      answer: '自動でSNSにシェアする機能はありません。\n\n滑走履歴画面からシェアボタンをタップすると、画像や動画を出力できます。出力したデータをInstagram・X（旧Twitter）・Facebook等で共有してください。\n\nまた、チェックアウト時に「公開設定」をONにすると、yukiyama内のタイムラインにシェアされます。'
+    },
+
+    // ============================================================
+    // その他
+    // ============================================================
+    {
+      keywords: ['アップデート', '更新', '最新版', 'バージョン', 'アプリ更新'],
+      category: 'アプリ不具合',
+      question: 'アプリのアップデート方法',
+      answer: 'アプリのアップデートは、App Store（iPhone）またはGoogle Play（Android）から行えます。\n\n自動アップデートが有効になっていない場合は、手動でアップデートしてください。\n\n※最新バージョンでないと一部機能が利用できない場合があります。不具合の多くはアップデートで改善されますので、常に最新版のご利用をおすすめします。'
+    },
+    {
+      keywords: ['登録', '新規登録', '会員登録', 'アカウント作成', '始め方', 'インストール'],
+      category: 'アカウント',
+      question: '新規登録の方法',
+      answer: 'yukiyamaアプリをインストール後、以下のいずれかの方法で登録できます。\n\n・Googleアカウント\n・メールアドレス\n・Facebookアカウント\n\n未登録の状態ではアプリの利用はできませんので、まず登録をお願いいたします。'
+    },
+    {
+      keywords: ['石井スポーツ', '会員証', 'バーコード', 'ici'],
+      category: 'その他',
+      question: '石井スポーツ会員証の登録方法',
+      answer: '石井スポーツ会員証の登録は、カードのバーコード情報をスマホのカメラで読み取ると、アプリ内に登録されます。\n\nマイページから会員証を表示できるようになります。'
+    },
+    {
+      keywords: ['プロフィール', 'マイページ', 'ニックネーム', '名前変更', 'アバター変更'],
+      category: 'その他',
+      question: 'プロフィールを編集したい',
+      answer: 'プロフィールの編集はマイページから行えます。\n\n「年齢」「性別」「お住まい」「ジャンル」以外の項目は任意入力で、非公開設定も可能です。\n\nプロフィールに写真を設定することもできます。'
+    },
+    {
+      keywords: ['お気に入り', 'お気に入り登録', 'ブックマーク'],
+      category: 'スキー場情報',
+      question: 'スキー場をお気に入り登録したい',
+      answer: 'スキー場をお気に入り登録するには、スキー場詳細画面の右上にある「★」マークまたは「★お気に入り登録」をタップしてください。\n\nお気に入りに登録したスキー場は、ホーム画面からすぐにアクセスできます。'
+    }
+  ];
+
+  // ==========================================
+  // カテゴリメニュー
+  // ==========================================
+  // カテゴリ順 = 問い合わせ頻度順（2025〜2026年メール・Slack分析に基づく）
+  const categories = [
+    { label: 'チェックイン', icon: '📍' },
+    { label: 'ログイン', icon: '🔑' },
+    { label: '滑走データ', icon: '⛷' },
+    { label: 'サポーター契約', icon: '💎' },
+    { label: 'アプリ不具合', icon: '🔧' },
+    { label: 'イベント・クーポン', icon: '🎫' },
+    { label: 'アカウント', icon: '👤' },
+    { label: '外部連携', icon: '⌚' },
+    { label: 'グループ・フレンド', icon: '👥' },
+    { label: 'スキー場情報', icon: '🏔' },
+    { label: '迷惑行為・通報', icon: '🚫' },
+    { label: 'プッシュ通知', icon: '🔔' },
+    { label: 'その他', icon: '📋' }
+  ];
+
+  // ==========================================
+  // DOM要素
+  // ==========================================
+  const toggleBtn = document.getElementById('chatToggle');
+  const chatWindow = document.getElementById('chatWindow');
+  const closeBtn = document.getElementById('chatClose');
+  const messagesEl = document.getElementById('chatMessages');
+  const inputEl = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('chatSend');
+
+  // ==========================================
+  // チャット開閉
+  // ==========================================
+  toggleBtn.addEventListener('click', function() {
+    chatWindow.classList.add('open');
+    toggleBtn.classList.add('open');
+    if (messagesEl.children.length === 0) showWelcome();
+    inputEl.focus();
+  });
+
+  closeBtn.addEventListener('click', function() {
+    chatWindow.classList.remove('open');
+    toggleBtn.classList.remove('open');
+  });
+
+  // ==========================================
+  // メッセージ表示
+  // ==========================================
+  function addMessage(text, sender) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message ' + sender;
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = text.replace(/\n/g, '<br>');
+    msgDiv.appendChild(bubble);
+    messagesEl.appendChild(msgDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function showTyping() {
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'message bot';
+    typingDiv.id = 'typing';
+    typingDiv.innerHTML = '<div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+    messagesEl.appendChild(typingDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function hideTyping() {
+    const typing = document.getElementById('typing');
+    if (typing) typing.remove();
+  }
+
+  // ==========================================
+  // ウェルカムメッセージ
+  // ==========================================
+  function showWelcome() {
+    addMessage('こんにちは！yukiyamaサポートbotです ⛷\nご質問のカテゴリを選択するか、お困りの内容を入力してください。', 'bot');
+    showCategories();
+  }
+
+  function showCategories() {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message bot';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+
+    const btnContainer = document.createElement('div');
+    btnContainer.className = 'category-buttons';
+
+    categories.forEach(function(cat) {
+      const btn = document.createElement('button');
+      btn.className = 'category-btn';
+      btn.textContent = cat.icon + ' ' + cat.label;
+      btn.addEventListener('click', function() {
+        handleCategorySelect(cat.label);
+      });
+      btnContainer.appendChild(btn);
+    });
+
+    bubble.appendChild(btnContainer);
+    msgDiv.appendChild(bubble);
+    messagesEl.appendChild(msgDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // ==========================================
+  // カテゴリ選択処理
+  // ==========================================
+  function handleCategorySelect(category) {
+    addMessage(category + 'について知りたい', 'user');
+
+    const matchingFaqs = faqData.filter(function(faq) {
+      return faq.category === category;
+    });
+
+    if (matchingFaqs.length > 0) {
+      showTyping();
+      setTimeout(function() {
+        hideTyping();
+
+        let response = '「' + category + '」に関するよくある質問です。\n該当するものをタップしてください。';
+        addMessage(response, 'bot');
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message bot';
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        const btnContainer = document.createElement('div');
+        btnContainer.className = 'category-buttons';
+
+        matchingFaqs.forEach(function(faq) {
+          const btn = document.createElement('button');
+          btn.className = 'category-btn';
+          var btnLabel = faq.question || faq.keywords[0];
+          btn.textContent = btnLabel;
+          btn.addEventListener('click', function() {
+            addMessage(btnLabel, 'user');
+            showTyping();
+            setTimeout(function() {
+              hideTyping();
+              addMessage(faq.answer, 'bot');
+              showFollowUp();
+            }, 600);
+          });
+          btnContainer.appendChild(btn);
+        });
+
+        bubble.appendChild(btnContainer);
+        msgDiv.appendChild(bubble);
+        messagesEl.appendChild(msgDiv);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }, 500);
+    }
+  }
+
+  // ==========================================
+  // フォローアップ
+  // ==========================================
+  function showFollowUp() {
+    setTimeout(function() {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'message bot';
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.innerHTML = 'この回答で解決しましたか？';
+
+      const btnContainer = document.createElement('div');
+      btnContainer.className = 'category-buttons';
+      btnContainer.style.marginTop = '8px';
+
+      const yesBtn = document.createElement('button');
+      yesBtn.className = 'category-btn';
+      yesBtn.textContent = '解決した';
+      yesBtn.addEventListener('click', function() {
+        addMessage('解決した', 'user');
+        showTyping();
+        setTimeout(function() {
+          hideTyping();
+          addMessage('お役に立てて良かったです！\n他にご質問があれば、いつでもお気軽にどうぞ。', 'bot');
+          showCategories();
+        }, 400);
+      });
+
+      const noBtn = document.createElement('button');
+      noBtn.className = 'category-btn';
+      noBtn.textContent = '解決しない';
+      noBtn.addEventListener('click', function() {
+        addMessage('解決しない', 'user');
+        showTyping();
+        setTimeout(function() {
+          hideTyping();
+          addMessage('申し訳ございません。お問い合わせフォームより詳しい状況をお知らせください。担当者が個別に対応いたします。\n\n<a href="https://yuki-yama.com/contact" target="_blank">お問い合わせフォームはこちら</a>\n\n※状況により返信までお時間をいただく場合がございます。', 'bot');
+        }, 400);
+      });
+
+      const otherBtn = document.createElement('button');
+      otherBtn.className = 'category-btn';
+      otherBtn.textContent = '他の質問がある';
+      otherBtn.addEventListener('click', function() {
+        addMessage('他の質問がある', 'user');
+        showTyping();
+        setTimeout(function() {
+          hideTyping();
+          addMessage('どのカテゴリについてお聞きになりたいですか？', 'bot');
+          showCategories();
+        }, 400);
+      });
+
+      btnContainer.appendChild(yesBtn);
+      btnContainer.appendChild(noBtn);
+      btnContainer.appendChild(otherBtn);
+      bubble.appendChild(btnContainer);
+      msgDiv.appendChild(bubble);
+      messagesEl.appendChild(msgDiv);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }, 500);
+  }
+
+  // ==========================================
+  // キーワードマッチング検索（改善版）
+  // ==========================================
+
+  // 日本語の助詞・助動詞・丁寧語を除去してマッチング精度を上げる
+  function normalizeJapanese(text) {
+    return text
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      // 丁寧語の語尾を除去
+      .replace(/ません$/g, 'ない')
+      .replace(/ました$/g, 'た')
+      .replace(/ですか[？?]?$/g, '')
+      .replace(/です$/g, '')
+      .replace(/ます$/g, '')
+      .replace(/ください$/g, '')
+      .replace(/でしょうか[？?]?$/g, '')
+      // 助詞を除去（が、は、を、に、で、の、も、と、へ、か、よ、ね）
+      .replace(/[がはをにでのもとへかよね]/g, '')
+      // 句読点・記号を除去
+      .replace(/[。、！？!?・「」『』（）()【】\[\]…]/g, '');
+  }
+
+  function findAnswer(query) {
+    const normalizedQuery = normalizeJapanese(query);
+    let bestMatch = null;
+    let bestScore = 0;
+
+    faqData.forEach(function(faq) {
+      let score = 0;
+      faq.keywords.forEach(function(keyword) {
+        const normalizedKeyword = normalizeJapanese(keyword);
+
+        // 完全一致（正規化後）
+        if (normalizedQuery === normalizedKeyword) {
+          score += normalizedKeyword.length * 2;
+          return;
+        }
+
+        // クエリにキーワードが含まれる
+        if (normalizedQuery.indexOf(normalizedKeyword) !== -1) {
+          score += normalizedKeyword.length;
+        }
+
+        // キーワードにクエリが含まれる
+        if (normalizedKeyword.indexOf(normalizedQuery) !== -1) {
+          score += normalizedQuery.length * 0.8;
+        }
+
+        // 部分一致（キーワードを分割して各パーツで照合）
+        var words = keyword.split(/[・\s]/);
+        words.forEach(function(word) {
+          var nw = normalizeJapanese(word);
+          if (nw.length >= 2 && normalizedQuery.indexOf(nw) !== -1) {
+            score += nw.length * 0.5;
+          }
+        });
+
+        // 2文字以上の連続一致をチェック（ファジーマッチ）
+        for (var i = 0; i < normalizedKeyword.length - 1; i++) {
+          var chunk = normalizedKeyword.substring(i, i + 3);
+          if (chunk.length >= 2 && normalizedQuery.indexOf(chunk) !== -1) {
+            score += 0.3;
+          }
+        }
+      });
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = faq;
+      }
+    });
+
+    return bestScore >= 2 ? bestMatch : null;
+  }
+
+  // ==========================================
+  // ユーザー入力処理
+  // ==========================================
+  function handleUserInput() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+
+    addMessage(text, 'user');
+    inputEl.value = '';
+
+    showTyping();
+
+    setTimeout(function() {
+      hideTyping();
+
+      const match = findAnswer(text);
+
+      if (match) {
+        addMessage(match.answer, 'bot');
+        showFollowUp();
+      } else {
+        addMessage('申し訳ございません、お探しの内容に該当する回答が見つかりませんでした。\n\n以下からカテゴリを選択していただくか、お問い合わせフォームより詳しい状況をお知らせください。担当者が個別に対応いたします。\n\n<a href="https://yuki-yama.com/contact" target="_blank">📩 お問い合わせフォームはこちら</a>', 'bot');
+        showCategories();
+      }
+    }, 800);
+  }
+
+  // ==========================================
+  // イベントリスナー
+  // ==========================================
+  sendBtn.addEventListener('click', handleUserInput);
+  inputEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      handleUserInput();
+    }
+  });
+
+})();
+</script>
+
+</body>
+</html>
