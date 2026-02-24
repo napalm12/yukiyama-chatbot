@@ -35,7 +35,7 @@
     position: fixed;
     bottom: 24px;
     right: 24px;
-    width: 380px;
+    width: 320px;
     max-width: calc(100vw - 32px);
     height: 560px;
     max-height: calc(100vh - 48px);
@@ -692,7 +692,7 @@
     chatWindow.classList.add('open');
     toggleBtn.classList.add('open');
     if (messagesEl.children.length === 0) showWelcome();
-    inputEl.focus();
+    // inputEl.focus(); // スマホでキーボードが自動表示されないよう無効化
   });
 
   closeBtn.addEventListener('click', function() {
