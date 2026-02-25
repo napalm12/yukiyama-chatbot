@@ -15,7 +15,7 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: #1a73e8;
+    background: #122b57;
     color: #fff;
     border: none;
     cursor: pointer;
@@ -35,7 +35,7 @@
     position: fixed;
     bottom: 24px;
     right: 24px;
-    width: 300px;
+    width: 380px;
     max-width: calc(100vw - 32px);
     height: 560px;
     max-height: calc(100vh - 48px);
@@ -72,7 +72,7 @@
 
   /* ヘッダー */
   .chat-header {
-    background: linear-gradient(135deg, #1a73e8, #4a9ff5);
+    background: linear-gradient(135deg, #122b57, #1e4a8c);
     color: #fff;
     padding: 16px 20px;
     display: flex;
@@ -85,16 +85,11 @@
     gap: 10px;
   }
   .chat-header-title .logo {
-    width: 32px;
-    height: 32px;
-    background: #fff;
-    border-radius: 50%;
+    width: 38px;
+    height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: bold;
-    color: #1a73e8;
-    font-size: 14px;
   }
   .chat-header h3 { font-size: 15px; font-weight: 600; }
   .chat-header p { font-size: 11px; opacity: 0.85; margin-top: 2px; }
@@ -145,12 +140,12 @@
     border-top-left-radius: 4px;
   }
   .message.user .bubble {
-    background: #1a73e8;
+    background: #122b57;
     color: #fff;
     border-top-right-radius: 4px;
   }
   .message .bubble a {
-    color: #1a73e8;
+    color: #122b57;
     text-decoration: underline;
   }
   .message.user .bubble a { color: #b3d4ff; }
@@ -158,22 +153,24 @@
   /* カテゴリ選択ボタン */
   .category-buttons {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    flex-direction: column;
+    gap: 6px;
     margin-top: 8px;
   }
   .category-btn {
-    background: #e8f0fe;
-    color: #1a73e8;
-    border: 1px solid #c5d9f7;
-    border-radius: 20px;
-    padding: 6px 14px;
+    background: #dce6f4;
+    color: #122b57;
+    border: 1px solid #b4c8e4;
+    border-radius: 8px;
+    padding: 8px 14px;
     font-size: 13px;
     cursor: pointer;
     transition: all 0.15s;
+    text-align: left;
+    width: 100%;
   }
   .category-btn:hover {
-    background: #1a73e8;
+    background: #122b57;
     color: #fff;
   }
 
@@ -194,9 +191,9 @@
     outline: none;
     font-family: inherit;
   }
-  .chat-input:focus { border-color: #1a73e8; }
+  .chat-input:focus { border-color: #122b57; }
   .chat-send {
-    background: #1a73e8;
+    background: #122b57;
     color: #fff;
     border: none;
     border-radius: 50%;
@@ -208,7 +205,7 @@
     align-items: center;
     justify-content: center;
   }
-  .chat-send:hover { background: #1557b0; }
+  .chat-send:hover { background: #0d1f3e; }
   .chat-send:disabled { background: #ccc; cursor: not-allowed; }
 
   /* タイピングインジケータ */
@@ -228,8 +225,10 @@
 
 <!-- チャットトグルボタン -->
 <button class="chat-toggle" id="chatToggle" aria-label="チャットを開く">
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  <svg width="36" height="28" viewBox="0 0 36 28" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="18,2 28,20 8,20"/>
+    <polygon points="28,9 36,22 20,22"/>
+    <polygon points="8,9 0,22 16,22"/>
   </svg>
 </button>
 
@@ -237,7 +236,13 @@
 <div class="chat-window" id="chatWindow">
   <div class="chat-header">
     <div class="chat-header-title">
-      <div class="logo">Y</div>
+      <div class="logo">
+        <svg width="38" height="28" viewBox="0 0 36 28" fill="white" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="18,1 28,19 8,19"/>
+          <polygon points="28,8 36,21 20,21"/>
+          <polygon points="8,8 0,21 16,21"/>
+        </svg>
+      </div>
       <div>
         <h3>yukiyama サポート</h3>
         <p>よくあるご質問にお答えします</p>
