@@ -150,7 +150,7 @@
   }
   .message.user .bubble a { color: #b3d4ff; }
 
-  /* カテゴリ選択ボタン */
+  /* カテゴリ選択ボタン（共通） */
   .category-buttons {
     display: flex;
     flex-direction: column;
@@ -172,6 +172,17 @@
   .category-btn:hover {
     background: #122b57;
     color: #fff;
+  }
+
+  /* 1階層目カテゴリボタン：文字幅に合わせて折り返し */
+  .category-buttons--tags {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .category-buttons--tags .category-btn {
+    width: auto;
+    text-align: center;
   }
 
   /* 入力エリア */
@@ -723,7 +734,7 @@
     bubble.className = 'bubble';
 
     const btnContainer = document.createElement('div');
-    btnContainer.className = 'category-buttons';
+    btnContainer.className = 'category-buttons category-buttons--tags';
 
     categories.forEach(function(cat) {
       const btn = document.createElement('button');
